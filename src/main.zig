@@ -1,9 +1,7 @@
 const std = @import("std");
 const vaxis = @import("vaxis");
 
-// Eventは、libvaxisから受け取る情報の型を定義している
 const Event = union(enum) {
-    // key_pressという種類のイベントを受け取り、その中にはvaxis.Key型のキー情報が入ると定義している
     key_press: vaxis.Key,
 };
 
@@ -20,43 +18,55 @@ pub fn main(init: std.process.Init) !void {
 
     try vx.enterAltScreen(tty.writer());
 
-    try tty.writer().writeAll("Press q to exit\r\n");
-    try tty.writer().flush();
+    // # Vaxisの画面上に文字を配置して、その内容をターミナルへ描画したい
 
-    // `vaxis.Loop(Event)` Event型を受け渡すループの型を作る
-    // `.init(...)` 使用する I/O・TTY・Vaxisを渡して初期化する
+    // ターミナルの大きさを取得する
+    //
+    // 現在の端末が何行・何列あるかなどを取得している
+    const size = try tty.getWinsize();
+
+    // その大きさの画面情報を用意する
+    //
+    // Vaxisが、各位置に表示する文字や色を保存できるように
+    // 画面サイズに応じたメモリを確保する
+    //
+    // この処理では、端末側の表示領域のクリアなども行われる
+    try vx.resize(alloc, tty.writer(), size);
+
+    // 画面に文字を配置する
+    //
+    // `win` は画面全体を対象に文字などを配置するための描画領域
+    // OSのウィンドウを新しく作る処理ではない
+    //
+    // `win.clear()` は、Vaxisがメモリ上で管理している画面を空にする
+    const win = vx.window();
+    win.clear();
+
+    // `printSegment()` で指定した位置へ文字を配置する
+    _ = win.printSegment(
+        .{ .text = "Press q to exit" },
+
+        // 0から数えるので、上から2行目、左から3列目へ配置する
+        .{ .row_offset = 1, .col_offset = 2 },
+    );
+
+    // 配置した内容をターミナルへ反映する
+    //
+    // Vaxisはメモリ上の画面情報を前回の描画結果として比較し、必要な文字や制御命令をWriterへ書き込み、出力のための`flush()`も内部で実施する
+    try vx.render(tty.writer());
+
+    // 今回、重要なのは printSegment()はメモリ上の画面を書き換えて、 render()がその内容をターミナルへ反映するという役割の分担を理解すること
+
     var loop: vaxis.Loop(Event) = .init(init.io, &tty, &vx);
 
-    // ユーザーからの入力の読み取りと解析をlibvaxisに任せて、解析結果を受け取る
-    // 1. ユーザーのキー入力
-    // 2. libvaxisがバイト列を読み取る
-    // 3. libvaxisが「押されたキー」の情報へ変換する
-    // 4. アプリが情報を受け取る
-    // 5. アプリが「qなら終了」と判断する
-
-    // loop.start() により入力の読み取りを開始する
-    // labvaxisでは、別の入力処理タスクが開始される
-    // そのタスクがターミナルからの入力を読み取り
-    // 解析したイベントを、順番に受け入れるためにキューへ入れる
     try loop.start();
     defer loop.stop();
 
-    //  libvaxis側                         main側
-    //
-    // 端末から入力を読む
-    //     ↓
-    // キー情報へ変換する
-    //     ↓
-    // キューへ入れる ─────────────→ nextEvent()で取り出す
-    //                                   ↓
-    //                              qかどうか判断する
     while (true) {
-        // `loop.nextEvent()` によってアプリ側でキューから取り出す
         const event = try loop.nextEvent();
 
         switch (event) {
             .key_press => |key| {
-                // qが入力されるとループを抜ける
                 if (key.matches('q', .{})) break;
             },
         }
