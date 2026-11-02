@@ -89,6 +89,16 @@ pub fn build(b: *std.Build) void {
     // by passing `--prefix` or `-p`.
     b.installArtifact(exe);
 
+    // build.zig.zon ファイルの .dependenciesに登録したパッケージを読み込む
+    const vaxis_dep = b.dependency("vaxis", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // vaxis_dep.module("vaxis") でそのパッケージが公開している vaxiz モジュールを取り出す
+    // addImport("vaxis", ...) で実行ファイル側から @import("vaxis") モジュールとして参照できるようにする
+    exe.root_module.addImport("vaxis", vaxis_dep.module("vaxis"));
+
     // This creates a top level step. Top level steps have a name and can be
     // invoked by name when running `zig build` (e.g. `zig build run`).
     // This will evaluate the `run` step rather than the default step.
