@@ -18,47 +18,30 @@ pub fn main(init: std.process.Init) !void {
 
     try vx.enterAltScreen(tty.writer());
 
-    // # Vaxisの画面上に文字を配置して、その内容をターミナルへ描画したい
-
-    // ターミナルの大きさを取得する
-    //
-    // 現在の端末が何行・何列あるかなどを取得している
     const size = try tty.getWinsize();
 
-    // その大きさの画面情報を用意する
-    //
-    // Vaxisが、各位置に表示する文字や色を保存できるように
-    // 画面サイズに応じたメモリを確保する
-    //
-    // この処理では、端末側の表示領域のクリアなども行われる
     try vx.resize(alloc, tty.writer(), size);
 
-    // 画面に文字を配置する
-    //
-    // `win` は画面全体を対象に文字などを配置するための描画領域
-    // OSのウィンドウを新しく作る処理ではない
-    //
-    // `win.clear()` は、Vaxisがメモリ上で管理している画面を空にする
     const win = vx.window();
     win.clear();
 
-    // `printSegment()` で指定した位置へ文字を配置する
-    _ = win.printSegment(
-        .{ .text = "Press q to exit" },
+    const fruits = [_][]const u8{
+        "りんごりんごりんごりんごりんごりんごりんごりんご",
+        "みかんオレンジ",
+        "ぶどう",
+        "機能面で大きな修正はありません。直しておくなら、次の2点です。",
+    };
 
-        // 0から数えるので、上から2行目、左から3列目へ配置する
-        .{ .row_offset = 1, .col_offset = 2 },
-    );
-
-    // 配置した内容をターミナルへ反映する
-    //
-    // Vaxisはメモリ上の画面情報を前回の描画結果として比較し、必要な文字や制御命令をWriterへ書き込み、出力のための`flush()`も内部で実施する
+    for (fruits, 1..) |fruit, index| {
+        const row: u16 = @intCast(index);
+        _ = win.printSegment(
+            .{ .text = fruit },
+            .{ .row_offset = row, .col_offset = 2, .wrap = .none },
+        );
+    }
     try vx.render(tty.writer());
 
-    // 今回、重要なのは printSegment()はメモリ上の画面を書き換えて、 render()がその内容をターミナルへ反映するという役割の分担を理解すること
-
     var loop: vaxis.Loop(Event) = .init(init.io, &tty, &vx);
-
     try loop.start();
     defer loop.stop();
 
