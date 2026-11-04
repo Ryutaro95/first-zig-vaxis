@@ -23,7 +23,6 @@ pub fn main(init: std.process.Init) !void {
     try vx.resize(alloc, tty.writer(), size);
 
     const win = vx.window();
-    win.clear();
 
     const fruits = [_][]const u8{
         "りんごりんごりんごりんごりんごりんごりんごりんご",
@@ -32,25 +31,41 @@ pub fn main(init: std.process.Init) !void {
         "機能面で大きな修正はありません。直しておくなら、次の2点です。",
     };
 
-    for (fruits, 1..) |fruit, index| {
-        const row: u16 = @intCast(index);
-        _ = win.printSegment(
-            .{ .text = fruit },
-            .{ .row_offset = row, .col_offset = 2, .wrap = .none },
-        );
-    }
-    try vx.render(tty.writer());
+    var selected: usize = 0;
 
     var loop: vaxis.Loop(Event) = .init(init.io, &tty, &vx);
     try loop.start();
     defer loop.stop();
 
     while (true) {
+        win.clear();
+
+        for (fruits, 0..) |fruit, index| {
+            _ = win.printSegment(
+                .{
+                    .text = fruit,
+                    .style = .{ .reverse = index == selected },
+                },
+                .{
+                    .row_offset = @intCast(index + 1),
+                    .col_offset = 2,
+                    .wrap = .none,
+                },
+            );
+        }
+        try vx.render(tty.writer());
+
         const event = try loop.nextEvent();
 
         switch (event) {
             .key_press => |key| {
                 if (key.matches('q', .{})) break;
+                if (key.matches('j', .{}) and selected + 1 < fruits.len) {
+                    selected += 1;
+                }
+                if (key.matches('k', .{}) and selected > 0) {
+                    selected -= 1;
+                }
             },
         }
     }
